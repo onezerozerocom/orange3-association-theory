@@ -124,6 +124,7 @@ STEPS[3].render = () => R0[3]() +
       { given: true, cells: [T1S(SETS[0]), '4', '4 ÷ 5', '0.800', 'O'] },
       ...SETS.slice(1).map((s, j) => [T1S(s), ti('sc' + (j + 1), `${T1S(s)} 포함 거래 수`, 'sm'), `<span class="ws-auto" data-auto="sc${j + 1}"></span>`, `<span class="ws-auto" data-auto="sc${j + 1}" data-kind="sup"></span>`, pick('so' + (j + 1), ['O', 'X'], `${T1S(s)} 빈발`)])
     ], { cls: 'sup' }) +
+    SUP_READ +
     q('최소 몇 건 이상 포함되어야 빈발항목집합인가?') + ta('mn', 1, '최소 몇 건'));
 
 /* ---------- 4. [3단계] 향상도 ---------- */
@@ -136,6 +137,7 @@ STEPS[4].render = () => R0[4]() +
     tbl(['빈발 2-항목집합', '향상도 계산식', '향상도', '두 항목이 서로 독립<br>(향상도 = 1)일 때와 비교'], [
       [T1S([CUP, KIM]), liftF(1), `<span class="ws-auto" data-lift="1"></span>`, pick('lc1', ['< 1', '= 1', '> 1'], '독립일 때와 비교')],
       [T1S([KIM, SODA]), liftF(2), `<span class="ws-auto" data-lift="2"></span>`, pick('lc2', ['< 1', '= 1', '> 1'], '독립일 때와 비교')]], { cls: 'lift' }) +
+    LIFT_READ +
     q('{컵라면, 삼각김밥}은 함께 나온 거래가 3건으로 {삼각김밥, 탄산음료}의 2건보다 많다.&nbsp;그런데 향상도는 왜 더 낮을까?') + ta('lwhy', 3, '향상도가 더 낮은 까닭'));
 
 /* ---------- 5. [4단계] 신뢰도 ---------- */
@@ -148,6 +150,7 @@ STEPS[5].render = () => R0[5]() +
       { given: true, cells: [RN(RULES[0]), '3 ÷ 4', '0.750', '75.0%'] },
       ...[1, 2, 3].map(j => [RN(RULES[j]), `<span class="ws-div">${ti('cfn' + j, `${RN(RULES[j])} 계산식 앞`, 'sm')}<span class="op">÷</span>${ti('cfd' + j, `${RN(RULES[j])} 계산식 뒤`, 'sm')}</span>`, `<span class="ws-auto" data-conf="${j}"></span>`, ti('cp' + j, `${RN(RULES[j])} 백분율`, 'sm')])
     ], { cls: 'conf' }) +
+    CONF_READ +
     q('생각해 보기: 방향을 바꾸면 신뢰도는 왜 달라질 수 있을까?') + ta('cwhy', 3, '두 방향의 신뢰도'));
 
 /* ---------- 6. [5단계] 종합과 활용 + 저장 ---------- */

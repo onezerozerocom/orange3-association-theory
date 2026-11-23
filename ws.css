@@ -125,7 +125,7 @@ details .insight p{margin:0;color:var(--ink)}
 .ws-t.is .ws-ta{display:block;margin-top:4px}
 .ws-t.sup{width:100%;table-layout:fixed}   /* 다섯 열 너비를 똑같이 */
 .ws-t.sup td,.ws-t.sup th{width:20%;padding:5px 10px}
-.ws-t.sup td:first-child{word-break:keep-all}
+.ws-t.sup td:first-child{word-break:keep-all;white-space:normal}
 .ws-t.sup .ws-pick{flex-wrap:nowrap}
 .ws-note{margin:4px 0 0;font-size:15px;color:var(--ink-2);line-height:1.8}
 .ws-goal{color:var(--out-ink);font-weight:700}
@@ -180,3 +180,9 @@ details.t1ref .orders{margin-top:10px}
 /* 한 줄을 다 쓰는 빈칸: ( ……… ) 때문이다. */
 .ws-fill{display:flex;align-items:baseline;gap:2px;width:100%;white-space:nowrap}
 .ws-fill .ws-in{flex:1;min-width:0;max-width:none}
+/* 3단계: 향상도 읽는 법 */
+.lift-read{margin:0;padding-left:1.2em;display:grid;gap:6px;line-height:1.7}
+.lift-read .warn{color:var(--ink-2)}
+.lift-box{border:1px solid var(--line);border-radius:12px;padding:10px 16px;margin:12px 0;background:var(--surface)}
+.lift-box h4{margin:2px 0 8px;font-size:16px;color:var(--accent)}
+.lift-box .eyebrow{margin:0}
