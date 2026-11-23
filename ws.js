@@ -1,237 +1,179 @@
 /* =====================================================================
-   ws.js · 문제 풀이 합치기 (app.js 다음, core.js 앞에서 불러옵니다)
-   각 단계에 문제 칸을 넣고, '저장하기'로 이 브라우저에 답을 저장합니다.
-   app.js는 연관 분석 이론 시뮬레이션이고, 문제 칸과 관련된 내용은 모두 이 파일에 있습니다.
+   ws.js · 문제 풀이 (app.js 다음, core.js 앞에서 불러옵니다)
+   「연관 분석 학습지」의 문항을 단계마다 그대로 넣고, '저장하기'로 이 브라우저에 답을 저장합니다.
    ===================================================================== */
 
-/* ---------- 시뮬레이션 저장 키 · 기본값 ---------- */
-APP.key = 'association-theory-ws-v1';                    // 원래 이론 앱과 저장 공간을 나눔
-const _init0 = APP.init;
-APP.init = () => ({ ..._init0(), A: 2, B: 5, eA: 0, eB: 2 });   // 문제로 푸는 '삼각김밥 → 사이다'가 처음부터 보이지 않게
-
 /* ---------- 답 ('저장하기'를 누르면 이 브라우저에 저장, 다음에 열면 이어서) ---------- */
-const WS_KEY = 'association-theory-ws-answers-v1';
+const WS_KEY = 'association-theory-ws-answers-v2';
 let WSA = {}, savedAt = null;
 try { const d = JSON.parse(localStorage.getItem(WS_KEY) || 'null'); if (d && d.a) { WSA = d.a; savedAt = d.at || null; } } catch (e) {}
 let savedSnap = JSON.stringify(WSA);
 
 /* ---------- 입력 칸 만들기 ---------- */
 const bl = (k, w = 6, lab = '빈칸') => `<span class="ws-bl">(<input class="ws-in" data-k="${k}" style="width:${w}em" aria-label="${lab}" autocomplete="off">)</span>`;
+const bi = (k, w = 5, lab = '빈칸') => `<input class="ws-in" data-k="${k}" style="width:${w}em" aria-label="${lab}" autocomplete="off">`;
 const ti = (k, lab = '칸', cls = '') => `<input class="ws-in ws-cell ${cls}" data-k="${k}" aria-label="${lab}" autocomplete="off">`;
 const pick = (k, opts, lab = '') => `<span class="ws-pick" role="radiogroup"${lab ? ` aria-label="${lab}"` : ''}>${opts.map(o => `<label><input type="radio" name="${k}" data-k="${k}" value="${o}"><span>${o}</span></label>`).join('')}</span>`;
 const ta = (k, rows = 3, lab = '답') => `<textarea class="ws-ta" data-k="${k}" rows="${rows}" aria-label="${lab}"></textarea>`;
-const tbl = (head, rows, o = {}) => `<div class="tw"><table class="ws-t${o.cls ? ' ' + o.cls : ''}"><thead><tr>${head.map((h, i) => `<th class="${i === 0 ? 'l' : ''}">${h}</th>`).join('')}</tr></thead><tbody>${rows.map(r => `<tr>${r.map((c, i) => `<td class="${i === 0 ? 'l' : ''}">${c}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`;
+const tbl = (head, rows, o = {}) => `<div class="tw"><table class="ws-t${o.cls ? ' ' + o.cls : ''}"><thead><tr>${head.map((h, i) => `<th class="${i === 0 ? 'l' : ''}">${h}</th>`).join('')}</tr></thead><tbody>${rows.map(r => `<tr${r.given ? ' class="ws-given"' : ''}>${(r.cells || r).map((c, i) => `<td class="${i === 0 ? 'l' : ''}">${c}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`;
 const wsCard = (title, body, o = {}) => `<section class="card wide ws${o.plain ? ' plain' : ''}"><div class="card-h"><h3 class="ws-h">${title}</h3>${o.sub ? `<p>${o.sub}</p>` : ''}</div>${body}</section>`;
 const q = t => `<p class="ws-q">▣ ${t}</p>`;
+const qn = t => `<p class="ws-q">${t}</p>`;   // ① ② 처럼 번호가 있는 문항은 ▣ 없이
+const box = h => `<div class="ws-box">${h}</div>`;   // 답을 쓰는 문장 묶음
 const L = t => `<p class="ws-l">${t}</p>`;
-
-/* ---------- 원래 화면 고치기 (정답이 바로 보이는 부분 숨김) ---------- */
-function dom(h, fn) { const t = document.createElement('template'); t.innerHTML = h; fn(t.content); return t.innerHTML; }
-const splitCards = h => h.split(/(?=<section class="card)/).filter(x => x.trim());
 const R0 = STEPS.map(s => s.render);
-STEPS.forEach(s => { delete s.quiz; delete s.page; });    // 바로 채점하는 연습문제는 문제 칸으로 대신함, 쪽 표시 없앰
-Object.keys(MISSIONS).forEach(k => delete MISSIONS[k]);   // 도전 과제 대신 문제 칸으로 진행률을 셈
+// [표1]을 다시 볼 수 있는 접기 상자 (3~5단계)
+const t1Ref = () => `<details class="guide t1ref"><summary><span>표1</span>편의점 거래 기록 다시 보기</summary>${txCards(T1, T1_ITEMS, [])}</details>`;
 
-// 2~4단계에서 직접 계산하는 규칙: 주문 6건의 '삼각김밥 → 사이다' (반대 방향 포함)
-const isWS = (s, a, b) => ((a === 3 && b === 2) || (a === 2 && b === 3)) && s.N === 6 && s.nA === 4 && s.nB === 4 && s.nAB === 3;
-// 지지도 · 신뢰도 · 향상도 상자: 향상도의 뜻(4단계 빈칸의 정답)은 빼고 '향상도 > 1' 같은 표시만 남김
-const _mBox = mBox;
-mBox = (k, s, a, b) => dom(_mBox(k, s, a, b), r => {
-  const lift = r.querySelector('.mbox.lift small'), bd = lift?.querySelector('.badge');
-  if (lift && bd) { bd.className = 'badge ' + (bd.classList.contains('pos') ? 'gt1' : bd.classList.contains('neg') ? 'lt1' : ''); lift.innerHTML = bd.outerHTML; }   // 향상도 1 기준 색: 지지도·신뢰도 색과 겹치지 않게
-  if (!isWS(s, a, b)) return;
-  r.querySelectorAll('.mbox').forEach(m => {
-    const f = m.querySelector('.frac'); if (f) f.innerHTML = f.innerHTML.split('<br>')[0] + '<br>= ?';
-    const v = m.querySelector('.val'); if (v) v.textContent = '?';
-    if (m.classList.contains('lift')) m.querySelector('small')?.remove();
-  });
-});
-// 2~4단계 시뮬레이션: 직접 계산하는 규칙이면 건수 · 확률 · 막대를 가림
-['sup', 'conf', 'lift'].forEach(k => {
-  const f0 = VIEWS[k];
-  VIEWS[k] = () => {
-    const a = A().A, b = A().B, h = f0();
-    if (a === b || !isWS(stats(BOOK, a, b), a, b)) return h;
-    return dom(h.replace(/ \(\d+건\)/g, '').replace(/A∩B: \d+건/, 'A∩B')
-      .replace(/<div class="mbox lbars">[\s\S]*?<\/svg>/, '<div class="mbox lbars"><h4>신뢰도와 P(B) 비교</h4><p class="note">이 규칙은 막대를 가렸습니다.</p>'), r => {
-      // 계산 흐름: '무엇을 구할까?'는 남기고 계산과 결과는 ?로
-      r.querySelectorAll('.mflow .frac').forEach(f => { f.innerHTML = '<p class="mf-hidden">?</p>'; });
-      r.querySelectorAll('.mflow .val').forEach(v => { v.textContent = '?'; });
-    }) + '<p class="note">이 규칙의 값은 아래 [직접 계산하기]에서 구해 보세요.&nbsp;다른 상품을 고르면 값이 다시 보입니다.</p>';
-  };
-});
-// 2~4단계: 계산에 쓰는 숫자가 1단계 동시 구매표의 어느 칸인지 보여 줌
-// 숫자는 미리 적어 둔 칸만 보이고, 나머지는 학생이 1단계에서 쓴 값(없으면 ?)을 보여 줌 → 정답이 새로 드러나지 않음
-// 처음에는 접혀 있고, 화살표를 누르면 펼쳐짐 (시뮬레이션을 다시 그려도 펼친 상태를 기억)
-let ML_OPEN = false;
-document.addEventListener('toggle', e => { if (e.target.matches?.('details.ml')) ML_OPEN = e.target.open; }, true);
-const LINK_ROLE = { sup: ['ab'], conf: ['ab', 'a'], lift: ['ab', 'a', 'b'] };
-function mtxLink(k) {
-  const a = A().A, b = A().B; if (a === b) return '';
-  const key = (r, c) => r >= c ? [r, c] : [c, r];
-  const [abR, abC] = key(a, b), roles = LINK_ROLE[k];
-  const role = (r, c) => r === abR && c === abC && roles.includes('ab') ? 'ab' : r === a && c === a && roles.includes('a') ? 'a' : r === b && c === b && roles.includes('b') ? 'b' : '';
-  const cellV = (r, c) => GIVEN.has(`${r},${c}`) ? `<b>${BOOKM[r][c]}</b>` : filled(`m${r}${c}`) ? `<span class="ml-mine">${esc(String(WSA[`m${r}${c}`]).trim())}</span>` : '<span class="ml-q">?</span>';
-  const tag = { ab: 'A∩B', a: 'A', b: 'B' };
-  const table = `<div class="tw mtx ml-t"><table><thead><tr><th></th>${ITEMS.map(n => `<th>${n}</th>`).join('')}</tr></thead><tbody>${ITEMS.map((rn, r) => `<tr><th class="l">${rn}</th>${ITEMS.map((_, c) => {
-    if (c > r) return '<td class="dash">-</td>';
-    const ro = role(r, c);
-    return `<td class="${ro ? 'ml-on ml-' + ro : 'ml-off'}">${ro ? `<i class="ml-tag">${tag[ro]}</i>` : ''}${cellV(r, c)}</td>`;
-  }).join('')}</tr>`).join('')}</tbody></table></div>`;
-  const rows = [
-    ['ab', `(${ITEMS[abR]}, ${ITEMS[abC]}) 칸`, 'A와 B가 함께 들어 있는 주문 수', 'P(A∩B)'],
-    ['a', `(${ITEMS[a]}, ${ITEMS[a]}) 칸`, 'A가 들어 있는 주문 수', 'P(A)'],
-    ['b', `(${ITEMS[b]}, ${ITEMS[b]}) 칸`, 'B가 들어 있는 주문 수', 'P(B)']
-  ].filter(x => roles.includes(x[0]));
-  return `<details class="ml"${ML_OPEN ? ' open' : ''}><summary class="ml-h"><b>동시 구매표에서 읽기</b><span>누르면 1단계에서 만든 동시 구매표의 어느 칸이 이 계산에 쓰이는지 보입니다.</span></summary><div class="ml-body">${table}<ul class="ml-list">${rows.map(([ro, where, what, p]) => `<li><i class="ml-tag ml-${ro}">${tag[ro]}</i><span><b>${where}</b><br>${what} → ${p}의 분자</span></li>`).join('')}<li><i class="ml-tag ml-n">전체</i><span><b>전체 거래 수</b><br>주문 내역의 주문 수 → 모든 P( )의 분모</span></li></ul></div><p class="hint">굵은 숫자는 미리 적어 둔 칸, 파란 숫자는 내가 1단계에서 쓴 값, ?는 아직 비어 있는 칸입니다.</p></details>`;
-}
-['sup', 'conf', 'lift'].forEach(k => { const f1 = VIEWS[k]; VIEWS[k] = () => f1() + mtxLink(k); });
-// 연관 규칙 찾기: '좋은 규칙 n개' 숫자는 빼고, 표의 초록 줄을 보고 직접 세게 함
-const _rules = VIEWS.rules;
-VIEWS.rules = () => dom(_rules().replace(/<div class="tw scroll"/, `<div class="rule-sort"><span>표 정렬</span>${seg('sort', [['lift', '향상도순'], ['conf', '신뢰도순'], ['sup', '지지도순']], A().sort)}</div><div class="tw scroll"`), r => r.querySelectorAll('.fact').forEach(f => { if (f.querySelector('span')?.textContent.trim() === '좋은 규칙') f.remove(); }));
-// 1단계: 굵은 숫자 칸만 눌러서 주문을 확인 (빈칸은 직접 셈)
-VIEWS.hotinfo = () => {
-  const c = A().cell;
-  if (!c || !GIVEN.has(c)) return '<p class="note">굵은 숫자 칸을 누르면 위의 주문 내역에서 그 칸에 해당하는 주문이 강조됩니다.</p>';
-  const [r, k] = c.split(',').map(Number), ids = BOOK.map((o, i) => [o, i]).filter(([o]) => o.includes(r) && o.includes(k)).map(([, i]) => i + 1);
-  return `<p class="note"><b>(${ITEMS[r]}, ${ITEMS[k]})</b> ${r === k ? `: ${ITEMS[r]}이(가) 들어 있는 주문` : ': 두 품목이 함께 들어 있는 주문'} → 주문 ${ids.join(', ') || '없음'} · <b>${ids.length}번</b></p>`;
-};
-const _book1 = VIEWS.book1;
-VIEWS.book1 = () => { const c = A().cell; return c && !GIVEN.has(c) ? orderCards(BOOK, -1, -1) : _book1(); };
-function mtxWS() {
-  return `<div class="tw mtx"><table><thead><tr><th></th>${ITEMS.map(n => `<th>${n}</th>`).join('')}</tr></thead><tbody>${ITEMS.map((rn, r) => `<tr><th class="l">${rn}</th>${ITEMS.map((cn, c) =>
-    c > r ? '<td class="dash">-</td>'
-      : GIVEN.has(`${r},${c}`) ? `<td class="given ${A().cell === `${r},${c}` ? 'hot' : ''}"><button type="button" class="opt" style="padding:0 8px;border:0;background:none" data-act="cell" data-v="${r},${c}">${BOOKM[r][c]}</button></td>`
-        : `<td>${ti(`m${r}${c}`, `${rn} × ${cn}`)}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`;
-}
+/* ---------- 문항에 쓰는 항목집합 · 규칙 (학습지 순서 그대로) ---------- */
+const [CUP, KIM, HOT, SODA] = [0, 1, 2, 3];
+const SETS = [[CUP], [KIM], [HOT], [SODA], [CUP, KIM], [CUP, HOT], [KIM, HOT], [CUP, SODA], [KIM, SODA], [HOT, SODA], [CUP, KIM, HOT], [CUP, KIM, SODA], [CUP, HOT, SODA], [KIM, HOT, SODA], [CUP, KIM, HOT, SODA]];
+const T1S = s => setName(s, T1_ITEMS);
+const RULES = [[CUP, KIM], [KIM, CUP], [KIM, SODA], [SODA, KIM]];
+const RN = ([a, b]) => `${T1_ITEMS[a]} → ${T1_ITEMS[b]}`;
 
-/* ---------- 문항 목록 ---------- */
+/* ---------- 문항 목록 (진행률 · 단계 완료에 씀) ---------- */
 function FIELDS() {
   return [
-    ['s1_a', '1-빈칸 (일련의 ○○○)', 1], ['s1_b', '1-빈칸 (○○○ 분석)', 1], ['s1_c', '1-빈칸 (같은 주문에서 ○○)', 1], ['s1_d', '1-빈칸 (판매된 ○○)', 1],
-    ...BLANKS.map(([r, c]) => [`m${r}${c}`, `1-동시 구매표 ${ITEMS[r]} × ${ITEMS[c]}`, 1]),
-    ['hi_a', '1-▣ 가장 많이 함께 팔린 품목 1', 1], ['hi_b', '1-▣ 가장 많이 함께 팔린 품목 2', 1], ['hi_n', '1-▣ 함께 판매된 횟수', 1],
-    ['c_N', '2-전체 거래 수', 2], ['c_nAB', '2-함께 들어 있는 주문 수', 2], ['c_sup', '2-지지도', 2], ['sw1', '2-O/X 지지도', 2],
-    ['c_nA', '3-삼각김밥 주문 수', 3], ['c_conf', '3-신뢰도', 3], ['c_m1', '3-신뢰도의 뜻 (○건 중)', 3], ['c_m2', '3-신뢰도의 뜻 (○건에서)', 3], ['sw2', '3-O/X 신뢰도', 3],
-    ['c_nB', '4-사이다 주문 수', 4], ['c_pB', '4-P(사이다)', 4], ['c_lift', '4-향상도', 4], ['sw3', '4-O/X 향상도', 4],
-    ['lb1', '4-▣ 신뢰도 막대가 더 길 때', 4], ['lb2', '4-▣ 두 막대가 같을 때', 4], ['lb3', '4-▣ 신뢰도 막대가 더 짧을 때', 4],
-    ['s3_a', '4-빈칸 (향상도 > 1)', 4], ['s3_b', '4-빈칸 (향상도 = 1)', 4], ['s3_c', '4-빈칸 (향상도 < 1)', 4],
-    ['r_n', '5-▣ 좋은 규칙의 수', 5], ['r_a', '5-▣ 향상도가 가장 높은 규칙 A', 5], ['r_b', '5-▣ 향상도가 가장 높은 규칙 B', 5],
-    ['r_sup', '5-▣ 그 규칙의 지지도', 5], ['r_conf', '5-▣ 그 규칙의 신뢰도', 5], ['r_lift', '5-▣ 그 규칙의 향상도', 5],
-    ['r_why', '5-▣ 지지도가 낮은 규칙을 걸러 내는 까닭', 5], ['r_use', '5-▣ 규칙을 활용하는 방법', 5],
-    ...[1, 2, 3, 4, 5].map(i => ['mc' + i, `6-[${i}]`, 6])
+    ['think', '생각 열기', 1], ...['a', 'b', 'c', 'd', 'e', 'f', 'g'].map(x => ['s1_' + x, '개념 빈칸', 1]),
+    ['is_N', '전체 거래 수', 2], ['is_1', '1-항목집합 개수', 2], ['is_2', '2-항목집합', 2], ['is_2c', '2-항목집합 개수', 2], ['is_3', '3-항목집합', 2], ['is_3c', '3-항목집합 개수', 2], ['is_4', '4-항목집합', 2], ['is_4c', '4-항목집합 개수', 2], ['is_tot', '전체 항목집합 수', 2],
+    ...SETS.slice(1).map((s, j) => [['sc', 'so'].map(p => [p + (j + 1), T1S(s), 3])]).flat(2),
+    ['mn', '최소 몇 건', 3],
+    ...[1, 2].map(j => [['lfn' + j, `향상도 분자 ${j}`, 4], ['lfa' + j, `향상도 분모 앞 ${j}`, 4], ['lfb' + j, `향상도 분모 뒤 ${j}`, 4], ['lc' + j, `독립과 비교 ${j}`, 4]]).flat(), ['lwhy', '향상도가 더 낮은 까닭', 4],
+    ...[1, 2, 3].map(j => ['cfn', 'cfd', 'cp'].map(p => [p + j, RN(RULES[j]), 5])).flat(), ['cwhy', '두 방향의 신뢰도', 5],
+    ...[1, 2, 3].map(j => ['ts', 'tl', 'tc'].map(p => [p + j, RN(RULES[j]), 6])).flat(),
+    ...[['pa', '① 지표 1'], ['pb', '① 지표 2'], ['pc', '① 더 볼 지표'], ['ka', '㉠ 항목 1'], ['kb', '㉠ 항목 2'], ['ks', '㉠ 지지도'], ['kl', '㉠ 향상도'], ['xa', '㉡ 사는 상품'], ['xb', '㉡ 할인 상품'], ['xc', '㉡ 신뢰도'], ['xr', '㉡ 반대 방향 신뢰도'], ['good', '처음 행사'], ['gwhy', '처음 행사 까닭']].map(([k, n]) => [k, n, 6])
   ];
 }
-const SEC_LIST = [[1, '동시 구매표', '1번'], [2, '지지도', '2번'], [3, '신뢰도', '3번'], [4, '향상도', '4번'], [5, '연관 규칙 찾기', '5번'], [6, '종합 연습', '6번']];
-const SEC_NAMES = Object.fromEntries(SEC_LIST.map(([n, t]) => [n, `${n}. ${t}`]));
+const SEC_LIST = [[1, '개념', '오늘의 질문'], [2, '항목집합', '1단계'], [3, '지지도', '2단계'], [4, '향상도', '3단계'], [5, '신뢰도', '4단계'], [6, '종합', '5단계']];
+const SEC_NAMES = Object.fromEntries(SEC_LIST.map(([n, t, s]) => [n, n === 1 ? '개념' : `${s} ${t}`]));
 const filled = k => String(WSA[k] ?? '').trim() !== '';
 const secFields = s => FIELDS().filter(f => f[2] === s);
 
 /* ---------- 0. 먼저 알아보기 ---------- */
-STEPS[0].goal = '인터넷 쇼핑몰이나 편의점이 어떻게 함께 팔리는 상품을 찾아내는지 생각해 보고, 이 앱에서 어떤 시뮬레이션을 하게 되는지 살펴보세요.';
-STEPS[0].concept = '';
-STEPS[0].render = () => R0[0]() +
-  card('단계별 순서', `<ol class="proc">${SEC_LIST.map(([to, t, s]) => `<li><button type="button" data-act="go" data-step="${to}"><b>${t}</b><small>${s}</small></button></li>`).join('')}</ol><p class="note">각 단계의 시뮬레이션을 살펴보면서 빈칸과 질문에 직접 답을 써 보세요. <b>저장하기</b>를 누르면 이 브라우저에 저장되어, 다음에 다시 열어도 이어서 풀 수 있습니다.</p>`, { sub: '단계를 누르면 해당 단계로 이동합니다.' });
+STEPS[0].goal = '연관 분석이 무엇인지, 이 앱에서 어떤 순서로 공부하는지 살펴보세요.';
+STEPS[0].render = () => card('이 앱에서 할 일',
+  `<p class="note">편의점 거래 기록을 보고 지지도 · 향상도 · 신뢰도를 직접 계산하여, 어떤 행사를 할지 정해 봅니다.&nbsp;각 단계의 빈칸과 질문에 답을 써 보세요.</p>` +
+  `<ol class="proc">${SEC_LIST.map(([to, t, s]) => `<li><button type="button" data-act="go" data-step="${to}"><b>${t}</b><small>${s}</small></button></li>`).join('')}</ol>` +
+  `<p class="note"><b>저장하기</b>를 누르면 이 브라우저에 저장되어, 다음에 다시 열어도 이어서 풀 수 있습니다.</p>`, { sub: '단계를 누르면 해당 단계로 이동합니다.' });
 
-/* ---------- 1. 동시 구매표 ---------- */
-STEPS[1].concept = '';
-STEPS[1].render = () => {
-  const [ordCard] = splitCards(R0[1]());
-  return wsCard('1. 연관 분석과 동시 구매표',
+/* ---------- 1. 개념 ---------- */
+STEPS[1].render = () =>
+  wsCard('[생각 열기]',
+    q('온라인 쇼핑몰에서 어떤 상품을 장바구니에 담았더니 다른 상품을 추천받은 적이 있는가?&nbsp;그때 어떤 상품을 담았고, 어떤 상품을 추천받았는지 써 보자.&nbsp;쇼핑몰은 무엇을 근거로 그 상품을 추천했을까?') + ta('think', 3, '생각 열기')) +
+  wsCard('1. 연관 분석 모델의 개념',
     L(`- 연관 분석: 데이터 간의 유용한 규칙이나 패턴과 같이 일련의 ${bl('s1_a', 5)}을 찾아내는 분석 방법`) +
-    L(`- 고객들의 상품 구매 데이터에서 판매되는 품목 간의 연관성을 분석할 때 자주 사용하여 ${bl('s1_b', 6)} 분석이라고도 한다.`) +
-    L(`- 동시 구매표: 두 품목이 같은 주문에서 ${bl('s1_c', 5)} 판매된 횟수를 정리한 표`) +
-    L(`- 같은 품목끼리 만나는 칸에는 그 품목이 판매된 ${bl('s1_d', 4)}를 적는다.`)) +
-    ordCard.replace(/<p>[^<]*👁[^<]*<\/p>/, '<p>어느 편의점의 주문 6건입니다.&nbsp;아래 동시 구매표를 채울 때 살펴보세요.</p>') +
-    wsCard('[동시 구매표 만들기]',
-      q('위의 주문 6건을 보고 동시 구매표의 빈칸을 채워 보자.&nbsp;굵은 숫자는 미리 적어 둔 칸이다.') +
-      mtxWS() + slot('hotinfo') +
-      `<div class="ws-row">${L(`→ 같은 품목끼리 만나는 칸을 빼면, 함께 판매된 횟수가 가장 많은 두 품목은 ${bl('hi_a', 5)}와 ${bl('hi_b', 5)}이고, ${bl('hi_n', 2)}번 함께 판매되었다.`)}</div>`, { plain: true });
-};
+    L(`- 고객들의 상품 구매 데이터에서 품목 간의 연관성을 분석할 때 자주 사용하여 ${bl('s1_b', 6)} 분석이라고도 한다.`) +
+    L(`- ${bl('s1_c', 6)}: ‘만약 A가 발생하면 B도 발생할 가능성이 높다.’로 만들어진다.&nbsp;(A → B)`) +
+    L('- 활용 예시') +
+    L(`&nbsp;&nbsp;① 판매를 촉진하는 ${bl('s1_d', 4)} 상품을 선정하여 진열 위치 변경`) +
+    L('&nbsp;&nbsp;② 온라인 쇼핑몰의 고객 맞춤형 광고') +
+    L('&nbsp;&nbsp;③ 인터넷 동영상 서비스(OTT)의 추천 알고리즘') +
+    L(`- 유의미한 규칙을 찾으려면 ${bl('s1_e', 4)}, ${bl('s1_f', 4)}, ${bl('s1_g', 4)}를 측정한다.`) +
+    `<p class="ws-l ws-goal">→ 오늘은 편의점 거래 기록으로 세 지표를 직접 계산하여, 어떤 행사를 할지 정해 본다.</p>`) +
+  card('맥주는 왜 기저귀 옆에 있을까?',
+    `<p class="note">미국의 한 드럭스토어가 고객들이 어떤 물건을 한 바구니에 함께 담는지 알아보려고 구매 내역 데이터를 분석했습니다.&nbsp;그 결과, 전혀 관련이 없어 보이는 맥주와 기저귀를 함께 사는 경우가 많다는 사실을 발견했습니다.&nbsp;퇴근길에 기저귀를 사러 들른 사람들이 맥주도 함께 사 가는 경우가 많았기 때문이라는 설명이 있습니다.&nbsp;이 결과를 보고 몇몇 마트에서는 맥주와 기저귀를 가까운 곳에 진열하기도 했습니다.</p><p class="hint">출처: [똑똑!빅데이터] ① 맥주는 왜 기저귀 옆에 있을까 (이데일리, 2017.01.21.)의 내용을 줄여 옮김</p>`,
+    { pre: '<p class="eyebrow">데이터 이야기</p>' }) +
+  card('편의점에서 ‘컵라면 + 삼각김밥’ 행사를 한다면, 무엇을 보고 정할까?',
+    `<p class="note">① 묶음 상품(컵라면 + 삼각김밥 세트, 방향 없음)&nbsp;&nbsp;&nbsp;② 교차 할인(‘컵라면 사면 삼각김밥 반값’, 방향 있음)</p><p class="hint">1~4단계에서 지표를 계산한 뒤, 5단계에서 이 질문에 답합니다.</p>`,
+    { pre: '<p class="eyebrow">오늘의 질문</p>' });
 
-/* ---------- 2~4. 지지도 · 신뢰도 · 향상도 (같은 규칙 '삼각김밥 → 사이다'를 한 단계씩) ---------- */
-// 4단계 [생각해 보기]: 위 시뮬레이션의 막대만 다시 보여 줌 (여기서도 A, B를 바꿀 수 있음)
-VIEWS.lbars2 = () => {
-  const a = A().A, b = A().B;
-  if (a === b) return '<p class="fb bad">A와 B에 서로 다른 상품을 골라 주세요.</p>';
-  const s = stats(BOOK, a, b);
-  if (isWS(s, a, b)) return '<p class="note">삼각김밥과 사이다는 아래 [직접 계산하기]에서 구하므로 막대를 가렸습니다.&nbsp;다른 상품을 골라 보세요.</p>';
-  return `<div class="measure">${liftBars(s, a, b)}</div>`;
-};
-const LB_OPT = ['1보다 크다', '1이다', '1보다 작다'];
-const RULE_Q = '주문 6건에서 ‘만약 삼각김밥을 구매하면 사이다도 구매할 가능성이 높다.’라는 규칙의';
-const swapQ = (k, what) => q(`위의 시뮬레이션에서 다른 상품을 고르고 <b>⇄ A와 B 바꾸기</b>를 눌러 보자.&nbsp;A와 B의 순서를 바꾸어도 ${what}가 늘 같으면 O, 달라질 수 있으면 X 해 보자.`) +
-  `<div class="ws-row">${L(`${what}:`)}${pick(k, ['O', 'X'], `${what} O/X`)}</div>`;
-[2, 3, 4].forEach(i => { STEPS[i].concept = ''; });
+/* ---------- 2. [1단계] 항목집합 ---------- */
 STEPS[2].render = () => R0[2]() +
-  wsCard('[직접 계산하기] 삼각김밥 → 사이다의 지지도',
-    q(`${RULE_Q} 지지도를 구해 보자.&nbsp;(분수 또는 소수)`) +
-    tbl(['구하는 값', '답'], [
-      ['전체 거래 수', ti('c_N', '전체 거래 수')],
-      ['삼각김밥과 사이다가 함께 들어 있는 주문 수', ti('c_nAB', '함께 들어 있는 주문 수')],
-      ['<b>지지도</b> = P(A∩B)', ti('c_sup', '지지도')]]) +
-    swapQ('sw1', '지지도'));
+  wsCard('[1단계] 항목집합 구하기',
+    q('[표1]을 보고 작성 칸을 채워 보자.') +
+    `<p class="ws-l ws-total">전체 거래 수 : ${ti('is_N', '전체 거래 수', 'sm')} 건</p>` +
+    tbl(['확인할 내용', '항목집합', '개수'], [
+      ['1-항목집합', '<span class="ws-ref">{컵라면}, {삼각김밥}, {핫바}, {탄산음료}</span>', ti('is_1', '1-항목집합 개수', 'sm')],
+      ['2-항목집합', `<span class="ws-ref">{컵라면, 삼각김밥},</span>${ta('is_2', 2, '2-항목집합')}`, ti('is_2c', '2-항목집합 개수', 'sm')],
+      ['3-항목집합', ta('is_3', 2, '3-항목집합'), ti('is_3c', '3-항목집합 개수', 'sm')],
+      ['4-항목집합', ta('is_4', 1, '4-항목집합'), ti('is_4c', '4-항목집합 개수', 'sm')],
+      ['전체 항목집합 수', '<span class="ws-dash">-</span>', ti('is_tot', '전체 항목집합 수', 'sm')]], { cls: 'is' }) +
+    `<p class="ws-note">※ 전체 항목집합 수(공집합 제외) = 2<sup>n</sup> − 1&nbsp;&nbsp;(n = 서로 다른 항목의 수)<br>※ 2-항목집합 수 = <sub>n</sub>C<sub>2</sub> = n × (n − 1) ÷ 2</p>`);
+
+/* ---------- 3. [2단계] 지지도와 빈발항목집합 ---------- */
+// 소수 셋째 자리 반올림 (0.9375 → 0.938처럼, 컴퓨터 소수 오차 보정)
+const r3 = x => (Math.round(x * 1000 + 1e-6) / 1000).toFixed(3);
+// 계산식 · 지지도 칸: 학생이 쓴 '포함 거래 수'로 자동 작성 (비어 있으면 □)
+function autoFormulas() {
+  document.querySelectorAll('[data-auto]').forEach(el => {
+    const v = String(WSA[el.dataset.auto] ?? '').trim(), num = v !== '' && isFinite(+v);
+    el.textContent = el.dataset.kind === 'sup' ? (num ? r3(+v / 5) : '□') : `${v || '□'} ÷ 5`;
+    el.classList.toggle('empty', el.dataset.kind === 'sup' ? !num : !v);
+  });
+  // 향상도 = 분자 ÷ (분모 앞 × 분모 뒤), 세 칸이 모두 숫자일 때만
+  document.querySelectorAll('[data-lift]').forEach(el => {
+    const j = el.dataset.lift, [n, a, b] = ['lfn', 'lfa', 'lfb'].map(p => String(WSA[p + j] ?? '').trim());
+    const ok = [n, a, b].every(x => x !== '' && isFinite(+x)) && +a * +b !== 0;
+    el.textContent = ok ? r3(+n / (+a * +b)) : '□';
+    el.classList.toggle('empty', !ok);
+  });
+  // 신뢰도 = 앞 ÷ 뒤, 두 칸이 모두 숫자일 때만
+  document.querySelectorAll('[data-conf]').forEach(el => {
+    const j = el.dataset.conf, [n, d] = ['cfn', 'cfd'].map(p => String(WSA[p + j] ?? '').trim());
+    const ok = [n, d].every(x => x !== '' && isFinite(+x)) && +d !== 0;
+    el.textContent = ok ? r3(+n / +d) : '□';
+    el.classList.toggle('empty', !ok);
+  });
+}
 STEPS[3].render = () => R0[3]() +
-  wsCard('[직접 계산하기] 삼각김밥 → 사이다의 신뢰도',
-    q(`${RULE_Q} 신뢰도를 구해 보자.&nbsp;(분수 또는 소수)`) +
-    tbl(['구하는 값', '답'], [
-      ['삼각김밥이 들어 있는 주문 수', ti('c_nA', '삼각김밥 주문 수')],
-      ['<b>신뢰도</b> = 지지도 ÷ P(A)', ti('c_conf', '신뢰도')]]) +
-    L(`→ 신뢰도는 삼각김밥을 산 주문 ${bl('c_m1', 2)}건 중 ${bl('c_m2', 2)}건에서 사이다도 샀다는 뜻이다.`) +
-    swapQ('sw2', '신뢰도'));
-// 4단계 순서: 시뮬레이션 → [생각해 보기] 두 막대로 향상도 읽기 → [직접 계산하기] (맨 끝)
+  wsCard('[2단계] 지지도와 빈발항목집합 구하기',
+    q('15개 항목집합의 지지도를 빠짐없이 구해 보자.&nbsp;(지지도(X) = X의 모든 항목을 포함한 거래 수 ÷ 5)') +
+    L('&nbsp;&nbsp;&nbsp;포함 거래 수를 쓰면 ‘계산식’과 ‘지지도’는 자동으로 채워진다.&nbsp;최소 지지도인 0.4 이상이면 빈발에 O, 미만이면 X로 표시한다.') +
+    tbl(['항목집합', '포함 거래 수', '계산식', '지지도', '빈발 O/X'], [
+      { given: true, cells: [T1S(SETS[0]), '4', '4 ÷ 5', '0.800', 'O'] },
+      ...SETS.slice(1).map((s, j) => [T1S(s), ti('sc' + (j + 1), `${T1S(s)} 포함 거래 수`, 'sm'), `<span class="ws-auto" data-auto="sc${j + 1}"></span>`, `<span class="ws-auto" data-auto="sc${j + 1}" data-kind="sup"></span>`, pick('so' + (j + 1), ['O', 'X'], `${T1S(s)} 빈발`)])
+    ], { cls: 'sup' }) +
+    q('최소 몇 건 이상 포함되어야 빈발항목집합인가?') + ta('mn', 1, '최소 몇 건'));
+
+/* ---------- 4. [3단계] 향상도 ---------- */
+// 향상도 계산식: 분수 막대와 ×는 미리 그려 두고, 숫자(지지도) 세 개만 빈칸에 씀
+const liftF = j => `<span class="ws-frac"><span class="num">${ti('lfn' + j, `향상도 분자 ${j}`, 'sm')}</span><span class="den">${ti('lfa' + j, `향상도 분모 앞 ${j}`, 'sm')}<span class="op">×</span>${ti('lfb' + j, `향상도 분모 뒤 ${j}`, 'sm')}</span></span>`;
 STEPS[4].render = () => R0[4]() +
-  wsCard('[생각해 보기] 두 막대로 향상도 읽기',
-    `<div class="lb-sim">${pairCtl()}${slot('lbars2')}</div>` +
-    q('위의 막대를 보자.&nbsp;A, B를 여러 가지로 바꾸어 가며 두 막대의 길이를 비교하고, 향상도가 어떻게 되는지 골라 보자.&nbsp;그리고 그때 향상도 값의 의미를 써 보자.') +
-    tbl(['두 막대의 길이', '향상도', '향상도 값의 의미'], [
-      ['신뢰도 막대가 P(B) 막대보다 <b>길다</b>', pick('lb1', LB_OPT, '신뢰도 막대가 더 길 때 향상도'),
-        `A를 산 사람이 B를 더 많이 산다.<br>두 항목 A, B의 구매가 서로 ${bl('s3_a', 5)}이 있다.`],
-      ['두 막대의 길이가 <b>같다</b>', pick('lb2', LB_OPT, '두 막대가 같을 때 향상도'),
-        `A를 샀는지와 관계없이 B를 사는 비율이 같다.<br>두 항목은 서로 ${bl('s3_b', 5)}이다.`],
-      ['신뢰도 막대가 P(B) 막대보다 <b>짧다</b>', pick('lb3', LB_OPT, '신뢰도 막대가 더 짧을 때 향상도'),
-        `A를 산 사람이 B를 덜 산다.<br>A의 구매가 B의 구매를 ${bl('s3_c', 4)}한다.&nbsp;(음의 상관관계)`]], { cls: 'lb' }), { plain: true }) +
-  wsCard('[직접 계산하기] 삼각김밥 → 사이다의 향상도',
-    q(`${RULE_Q} 향상도를 구해 보자.&nbsp;(분수 또는 소수)`) +
-    tbl(['구하는 값', '답'], [
-      ['사이다가 들어 있는 주문 수', ti('c_nB', '사이다 주문 수')],
-      ['P(B) = P(사이다)', ti('c_pB', 'P(사이다)')],
-      ['<b>향상도</b> = 신뢰도 ÷ P(B)', ti('c_lift', '향상도')]]) +
-    swapQ('sw3', '향상도'));
+  wsCard('[3단계] 향상도로 연관성 분석하기',
+    t1Ref() +
+    q('2단계에서 구한 빈발 2-항목집합의 향상도를 구해 보자.&nbsp;(향상도는 두 항목의 순서를 바꾸어도 같다.)') +
+    tbl(['빈발 2-항목집합', '향상도 계산식', '향상도', '두 항목이 서로 독립<br>(향상도 = 1)일 때와 비교'], [
+      [T1S([CUP, KIM]), liftF(1), `<span class="ws-auto" data-lift="1"></span>`, pick('lc1', ['< 1', '= 1', '> 1'], '독립일 때와 비교')],
+      [T1S([KIM, SODA]), liftF(2), `<span class="ws-auto" data-lift="2"></span>`, pick('lc2', ['< 1', '= 1', '> 1'], '독립일 때와 비교')]], { cls: 'lift' }) +
+    q('{컵라면, 삼각김밥}은 함께 나온 거래가 3건으로 {삼각김밥, 탄산음료}의 2건보다 많다.&nbsp;그런데 향상도는 왜 더 낮을까?') + ta('lwhy', 3, '향상도가 더 낮은 까닭'));
 
-/* ---------- 5. 연관 규칙 찾기 ---------- */
-STEPS[5].concept = '';
-STEPS[5].render = () => {
-  const [ruleCard] = splitCards(R0[5]());
-  return ruleCard.replace(/<div class="seg"[^>]*>(?:<button[^>]*data-act="sort"[^>]*>[^<]*<\/button>)+<\/div>/, '').replace(' 초록 줄이 표시된 행이 좋은 규칙입니다.', ' 초록 줄이 표시된 행은 최소 지지도 · 최소 신뢰도를 만족하고 향상도가 1보다 큰 규칙입니다.') +
-    wsCard('[연관 규칙 찾기] 편의점 주문 40건',
-      q('위의 탐색기에서 데이터를 <b>편의점 주문 40건 (가상)</b>으로 바꾸고, 최소 지지도를 0.2, 최소 신뢰도를 0.6으로 맞춘 뒤 답해 보자.') +
-      L(`① 최소 지지도와 최소 신뢰도를 만족하면서 향상도가 1보다 큰 규칙은 ${bl('r_n', 3)}개이다.`) +
-      L(`② 그중 향상도가 가장 높은 규칙은 ‘만약 ${bl('r_a', 5)}을(를) 구매하면 ${bl('r_b', 5)}도 구매할 가능성이 높다.’이다.&nbsp;(향상도가 같은 규칙이 여럿이면 하나만 쓴다.)`) +
-      tbl(['②의 규칙', '지지도', '신뢰도', '향상도'], [['값 (소수 셋째 자리까지)', ti('r_sup', '지지도'), ti('r_conf', '신뢰도'), ti('r_lift', '향상도')]]) +
-      q('③ 데이터를 <b>편의점 주문 6건</b>으로 바꾸어 보자.&nbsp;‘커피 → 껌’은 신뢰도가 1이고 향상도도 높지만, 커피가 들어 있는 주문은 1건뿐이다.&nbsp;최소 지지도를 0.2로 올리면 이 규칙은 어떻게 되는지 확인하고, 지지도가 낮은 규칙을 걸러 내는 까닭을 써 보자.') + ta('r_why', 3, '지지도가 낮은 규칙을 걸러 내는 까닭') +
-      q('④ ②에서 찾은 규칙을 편의점에서 어떻게 활용할 수 있을지 써 보자.') + ta('r_use', 3, '규칙을 활용하는 방법'));
-};
+/* ---------- 5. [4단계] 신뢰도 ---------- */
+STEPS[5].render = () => R0[5]() +
+  wsCard('[4단계] 방향별 신뢰도 구하기',
+    t1Ref() +
+    q('하나의 빈발 2-항목집합에서 방향을 바꾼 두 규칙의 신뢰도를 구해 보자.') +
+    L('&nbsp;&nbsp;&nbsp;분모는 화살표 앞의 항목 A가 포함된 거래 수이다.') +
+    tbl(['연관 규칙', '신뢰도 계산식', '신뢰도', '백분율'], [
+      { given: true, cells: [RN(RULES[0]), '3 ÷ 4', '0.750', '75.0%'] },
+      ...[1, 2, 3].map(j => [RN(RULES[j]), `<span class="ws-div">${ti('cfn' + j, `${RN(RULES[j])} 계산식 앞`, 'sm')}<span class="op">÷</span>${ti('cfd' + j, `${RN(RULES[j])} 계산식 뒤`, 'sm')}</span>`, `<span class="ws-auto" data-conf="${j}"></span>`, ti('cp' + j, `${RN(RULES[j])} 백분율`, 'sm')])
+    ], { cls: 'conf' }) +
+    q('생각해 보기: 방향을 바꾸면 신뢰도는 왜 달라질 수 있을까?') + ta('cwhy', 3, '두 방향의 신뢰도'));
 
-/* ---------- 6. 종합 연습문제 + 저장 ---------- */
-const MC = [
-  ['연관 분석에 대한 설명으로 옳은 것은?', ['정답(레이블)이 있는 데이터로 결과값을 예측하는 방법이다.', '비슷한 데이터끼리 같은 군집으로 묶는 방법이다.', '데이터 간의 유용한 규칙이나 패턴과 같은 연관성을 찾아내는 방법이다.', '두 변수 사이의 관계를 직선으로 나타내는 방법이다.', '연관 규칙은 ‘A가 커지면 B는 작아진다.’의 형태로 만들어진다.']],
-  ['주문 10건 중 A가 들어 있는 주문이 5건, B가 들어 있는 주문이 4건, A와 B가 함께 들어 있는 주문이 2건이다.&nbsp;‘A → B’의 신뢰도는?', ['0.2', '0.4', '0.5', '0.8', '1']],
-  ['[2]의 주문 10건에서 ‘A → B’ 규칙에 대한 설명으로 옳은 것은?', ['지지도는 0.4이다.', '향상도는 1보다 크다.', '향상도가 1이므로 A와 B의 구매는 연관성이 없다.', 'A의 구매가 B의 구매를 억제한다.', '‘B → A’의 신뢰도도 0.4이다.']],
-  ['연관 규칙이 의미가 있는지 확인할 때 계산하는 순서로 알맞은 것은?', ['향상도 → 신뢰도 → 지지도', '지지도 → 향상도 → 신뢰도', '신뢰도 → 지지도 → 향상도', '지지도 → 신뢰도 → 향상도', '향상도 → 지지도 → 신뢰도']],
-  ['연관 분석 결과를 활용하는 방법으로 알맞지 <u>않은</u> 것은?', ['함께 잘 팔리는 상품을 가까이 진열한다.', '함께 잘 팔리는 상품으로 묶음 상품을 구성한다.', '연관 상품의 할인 쿠폰을 발행한다.', '온라인 쇼핑몰에서 함께 살 만한 상품을 추천한다.', '학생의 공부 시간으로 시험 점수를 예측한다.']]
-];
-STEPS.push({
-  title: '종합 연습', short: '종합 연습',
-  goal: '앞에서 배운 내용을 객관식으로 확인하고, 답을 저장합니다.',
-  concept: '',
-  render: () => wsCard('6. 종합 연습문제',
-    MC.map(([t, os], i) => `<div class="ws-mc"><p class="ws-q">[${i + 1}] ${t}</p><div class="ws-mc-o" role="radiogroup" aria-label="${i + 1}번 답">${os.map((o, k) => `<label><input type="radio" name="mc${i + 1}" data-k="mc${i + 1}" value="${k + 1}"><span>${CIRC[k]} ${o}</span></label>`).join('')}</div></div>`).join('')) +
-    `<section class="card wide ws-submit"><div class="card-h"><p class="eyebrow ws-eye">저장</p><h3>답 저장하기</h3><p>답은 <b>저장하기</b>를 눌러야 이 브라우저에 저장됩니다.&nbsp;다음에 같은 컴퓨터·같은 브라우저로 열면 저장한 답이 그대로 나옵니다.</p></div>
-      <div class="ws-left" id="leftList"></div>
-      <div class="ws-row"><button type="button" class="btn primary" id="saveBtn2">저장하기</button><button type="button" class="btn danger" id="clearBtn">저장한 답 지우기</button><span class="ws-msg" id="saveMsg2" aria-live="polite"></span></div></section>`
-});
-GROUPS[6] = '정리';
+/* ---------- 6. [5단계] 종합과 활용 + 저장 ---------- */
+// 세 지표 공식: 각각 네모 상자 (테두리는 정의 카드와 같은 색)
+const sumBox = (k, h) => `<div class="sum-box ${k}">${MATH(h)}</div>`;
+const sumF = sumBox('sup', mt('지지도(A, B)') + mo('=') + mf(nAB, mi('N'))) + sumBox('lift', mt('향상도(A, B)') + mo('=') + mf(PAB, P1('A') + mo('×') + P1('B'))) + sumBox('conf', mt('신뢰도(A → B)') + mo('=') + mf(nAB, mi('n') + mo('(') + mi('A') + mo(')')));
+STEPS[6].render = () =>
+  wsCard('[5단계] 결과를 종합하고 활용하기',
+    `<p class="note">지표 하나만 보면 잘못된 규칙이 남는다.&nbsp;지지도(충분히 자주?)·향상도(우연 이상?)·신뢰도(이 방향으로 믿을 만한가?)를 모두 확인한 규칙만 활용한다.</p><div class="sum3">${sumF}</div>` +
+    t1Ref() +
+    q('앞에서 계산한 값을 옮겨 적고, 세 지표를 함께 보며 해석해 보자.') +
+    tbl(['연관 규칙', '지지도', '향상도', '신뢰도'], [
+      { given: true, cells: [RN(RULES[0]), '0.600', '0.938', '0.750'] },
+      ...[1, 2, 3].map(j => [RN(RULES[j]), ti('ts' + j, `${RN(RULES[j])} 지지도`, 'sm'), ti('tl' + j, `${RN(RULES[j])} 향상도`, 'sm'), ti('tc' + j, `${RN(RULES[j])} 신뢰도`, 'sm')])
+    ], { cls: 'sum' }) +
+    qn('① [오늘의 질문] 편의점에서 ㉠ 묶음 상품(방향 없음) ㉡ 교차 할인(방향 있음) 행사를 한다면, 각각 어떤 지표를 근거로 고르겠는가?') +
+    box(L(`묶음 상품과 교차 할인 모두 ${bl('pa', 5, '① 지표 1')}와 ${bl('pb', 5, '① 지표 2')}를 확인한다.&nbsp;교차 할인은 방향이 있으므로, 여기에 ${bl('pc', 5, '① 더 볼 지표')}를 더 보고 어느 상품을 기준으로 할지 정한다.&nbsp;단, 거래 수가 5건뿐이므로 더 많은 자료로 다시 확인을 한다.`)) +
+    qn(`② ①의 기준에 따라 표의 값을 보고 행사를 정해 보자.&nbsp;또, 처음에 생각한 '컵라면 + 삼각김밥' 행사는 좋은 선택이었을까?`) +
+    box(L(`㉠ 묶음 상품: {${bi('ka', 5, '㉠ 항목 1')}, ${bi('kb', 5, '㉠ 항목 2')}} 세트 → 지지도 ${bl('ks', 4, '㉠ 지지도')}, 향상도 ${bl('kl', 4, '㉠ 향상도')}`) +
+    L(`㉡ 교차 할인: ${bl('xa', 5, '㉡ 사는 상품')}을/를 사면 ${bl('xb', 5, '㉡ 할인 상품')} 할인 → 신뢰도 ${bl('xc', 4, '㉡ 신뢰도')}, 반대 방향 신뢰도 ${bl('xr', 4, '㉡ 반대 방향 신뢰도')}`) +
+    L('단, 거래 수가 5건뿐이므로 더 많은 자료로 다시 확인해야 한다.') +
+    L(`처음의 ‘컵라면 + 삼각김밥’ 행사는 좋은 선택이 ${pick('good', ['맞다', '아니다'], '처음 행사')}.&nbsp;함께 산 거래는 3건으로 가장 많지만 향상도가 0.938 &lt; 1로, <span class="ws-fill">(<input class="ws-in" data-k="gwhy" aria-label="처음 행사 까닭" autocomplete="off">) 때문이다.</span>`))) +
+  `<section class="card wide ws-submit"><div class="card-h"><p class="eyebrow ws-eye">저장</p><h3>답 저장하기</h3><p>답은 <b>저장하기</b>를 눌러야 이 브라우저에 저장됩니다.&nbsp;다음에 같은 컴퓨터·같은 브라우저로 열면 저장한 답이 그대로 나옵니다.</p></div>
+    <div class="ws-left" id="leftList"></div>
+    <div class="ws-row"><button type="button" class="btn primary" id="saveBtn2">저장하기</button><button type="button" class="btn danger" id="clearBtn">저장한 답 지우기</button><span class="ws-msg" id="saveMsg2" aria-live="polite"></span></div></section>`;
+GROUPS[2] = '1~5단계';
 
 /* ---------- 단계 완료 · 진행률 · 위쪽 흐름 ---------- */
 APP.stepDone = i => i === 0 ? S.seen.has(0) : secFields(i).every(f => filled(f[0]));
@@ -259,12 +201,13 @@ function wsFill() {
     ll.innerHTML = left.length ? `<p class="note">아직 비어 있는 칸: ${left.map(([s, n]) => `${SEC_NAMES[s]} <b>${n}칸</b>`).join(', ')}</p>` : '<p class="note">모든 칸을 채웠어요.</p>';
   }
 }
-APP.afterRender = () => { wsFill(); showSaved(); };
+APP.afterRender = () => { wsFill(); autoFormulas(); showSaved(); };
 document.addEventListener('input', e => {
   const el = e.target.closest('[data-k]');
   if (!el) return;
   if (el.type === 'radio') { if (el.checked) WSA[el.dataset.k] = el.value; }
   else WSA[el.dataset.k] = el.value;
+  if (/^(sc|lf|cf)/.test(el.dataset.k)) autoFormulas();
   renderRail(); renderFlow(); showSaved();
   if ($('#leftList')) wsFill();
 });

@@ -74,23 +74,12 @@ details.ws-after{border-style:solid}
 details .insight{align-items:baseline;margin-top:10px}
 details .insight p{margin:0;color:var(--ink)}
 
-/* 1단계 동시 구매표: 칸 너비를 숫자 하나에 맞춤 */
-.mtx td .ws-cell{width:3.4em;min-width:0;font-family:var(--mono)}
-
-/* 3단계 실험 기록표 */
-.ws-t.xp td{padding:5px 6px}
-.ws-t.xp .ws-cell.xn{width:4.2em;min-width:0}
-.ws-t.xp th{white-space:nowrap}
-
-/* 먼저 알아보기 · 연관 규칙을 찾는 순서: 누를 수 없는 상자 */
-.proc .proc-i{flex:1;border:1px solid var(--line);background:var(--surface);border-radius:10px;padding:8px 11px;display:grid;gap:1px}
-
-/* 향상도 단계: 신뢰도와 P(B) 막대 비교 */
+/* 연습 시뮬레이션의 막대 두 개 비교 */
 .mbox.lbars{background:var(--surface)}
 .mbox.lbars h4{color:var(--ink-2)}
 .mbox.lbars svg{width:100%;max-width:420px}
 
-/* 2~4단계: 지지도(초록) · 신뢰도(분홍) · 향상도(하늘) 정의 카드와 계산 흐름 */
+/* 2~4단계: 지지도(초록) · 향상도(하늘) · 신뢰도(분홍) 정의 카드와 계산 흐름 */
 :root{--m-sup:var(--pos);--m-conf:var(--neg);--m-lift:#1d93c9}
 @media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--m-lift:#4db6e6}}
 :root[data-theme="dark"]{--m-lift:#4db6e6}
@@ -121,62 +110,73 @@ details .insight p{margin:0;color:var(--ink)}
   .mdef-name{justify-self:start}
 }
 
-/* 향상도 실험: 1보다 작음(회색) · 1보다 큼(파랑) — 지지도·신뢰도·향상도 색과 따로 */
-:root{--lt1:#8a919c;--gt1:#2f5fd0}
-@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--lt1:#9aa1ab;--gt1:#6b93f0}}
-:root[data-theme="dark"]{--lt1:#9aa1ab;--gt1:#6b93f0}
-.badge.lt1{background:color-mix(in oklab,var(--lt1) 22%,var(--surface));color:color-mix(in oklab,var(--lt1) 70%,var(--ink))}
-.badge.gt1{background:color-mix(in oklab,var(--gt1) 18%,var(--surface));color:var(--gt1)}
-
-/* 2~4단계: 동시 구매표에서 읽기 */
-.ml{display:block;border:1px dashed var(--line-2);border-radius:12px;padding:12px 14px;background:var(--surface)}
-.ml>*+*{margin-top:10px}
-.ml-h{display:grid;grid-template-columns:auto minmax(0,1fr);column-gap:8px;row-gap:2px;cursor:pointer;list-style:none}
-.ml-h::-webkit-details-marker{display:none}
-.ml-h::before{content:"▶";grid-row:1/3;align-self:center;font-size:13px;color:var(--accent);transition:transform .15s}
-.ml[open]>.ml-h::before{transform:rotate(90deg)}
-.ml-h:hover b{color:var(--accent)}
-.ml-h span{font-size:15px;color:var(--ink-2)}
-.ml-body{display:flex;flex-wrap:wrap;gap:14px;align-items:flex-start}
-.ml-body>.ml-t{flex:0 1 auto;max-width:100%;overflow-x:auto}
-.ml-body>.ml-list{flex:1 1 240px;min-width:0}
-.ml-t td{position:relative;height:38px}
-.ml-t td.ml-off{color:var(--muted);opacity:.55}
-.ml-t td.ml-on{font-weight:700;outline:2.5px solid var(--accent);outline-offset:-3px;background:var(--accent-weak)}
-.ml-t td.ml-a{outline-color:var(--s1);background:color-mix(in oklab,var(--s1) 12%,var(--surface))}
-.ml-t td.ml-b{outline-color:var(--s2);background:color-mix(in oklab,var(--s2) 12%,var(--surface))}
-.ml-t td.ml-ab{outline-color:var(--pos);background:color-mix(in oklab,var(--pos) 14%,var(--surface))}
-.ml-t .ml-tag{position:absolute;top:1px;left:3px;font-size:10.5px}
-.ml-tag{font-style:normal;font-weight:700;font-size:12.5px;border-radius:6px;padding:0 6px;color:#fff;background:var(--pos);white-space:nowrap;line-height:1.5}
-.ml-tag.ml-a,.ml-t .ml-a .ml-tag{background:var(--s1)}
-.ml-tag.ml-b,.ml-t .ml-b .ml-tag{background:var(--s2)}
-.ml-tag.ml-n{background:var(--ink-2)}
-.ml-t .ml-tag{color:#fff}
-.ml-mine{color:var(--accent);font-weight:700}
-.ml-q{color:var(--muted)}
-.ml-list{list-style:none;margin:0;padding:0;display:grid;gap:8px;font-size:15px}
-.ml-list li{display:grid;grid-template-columns:auto minmax(0,1fr);gap:8px;align-items:start}
-
 /* 주문 카드: 한 줄에 3개씩 (주문 6건 = 3개씩 2줄) */
 .orders{grid-template-columns:repeat(3,minmax(0,1fr))}
 @media (max-width:520px){.orders{grid-template-columns:repeat(2,minmax(0,1fr))}}
 
-/* 향상도 실험: 주문 카드 · 계산 상자 · 향상도 눈금 사이를 넓히고 가는 선으로 나눔 */
-.slot[data-v="edit"]>.measure{margin:18px 0;padding:22px 0;border-top:1px solid var(--line);border-bottom:1px solid var(--line)}
-/* 눈금 그림은 카드 너비만큼 늘어나면 글자가 커지므로 너비를 제한 (글자가 본문과 비슷한 크기) */
-.slot[data-v="edit"]>svg.chart{width:100%;max-width:600px;justify-self:center;margin:0 auto;display:block}
-
-/* 향상도 실험: 주문 추가 · 삭제 · 되돌리기 버튼은 오른쪽 끝에 */
-.slot[data-v="edit"]>.btns{justify-content:flex-end}
-
-/* 4단계 두 막대로 향상도 읽기: 고르기 3개를 한 줄에 */
-.ws-t.lb .ws-pick{flex-wrap:nowrap}
-.ws-t.lb td:nth-child(2){white-space:nowrap}
-.lb-sim{display:grid;gap:10px;justify-items:start}
-.lb-sim .measure{width:min(100%,560px)}
-.ws-t.lb td:nth-child(3){text-align:center;line-height:1.9}
-.ws-t.lb th:nth-child(3){text-align:center}
-
-/* 연관 규칙 찾기: 표 정렬 버튼을 표 바로 위 오른쪽에 */
-.rule-sort{display:flex;justify-content:flex-end;align-items:center;gap:8px;margin:14px 0 -6px}
-.rule-sort>span{font-size:14px;color:var(--muted)}
+/* 학습지 표: 미리 적힌 줄(예시)은 흐리게, 숫자 칸은 좁게 */
+.ws-t tr.ws-given td{color:var(--muted);background:var(--surface-2)}
+.ws-t .ws-cell.sm{width:5.5em;min-width:0;margin:0 auto;display:block}
+.ws-t.is td:first-child{width:22%;white-space:nowrap}
+.ws-t.is td:last-child,.ws-t.is th:last-child{width:6.5em;text-align:center}
+.ws-t.is .ws-dash{display:block;text-align:center;color:var(--muted)}
+.ws-t.is td{text-align:left}
+.ws-t.is .ws-cell.sm{display:inline-block;margin:0;width:4.5em}
+.ws-t.is .ws-ta{display:block;margin-top:4px}
+.ws-t.sup{width:100%;table-layout:fixed}   /* 다섯 열 너비를 똑같이 */
+.ws-t.sup td,.ws-t.sup th{width:20%;padding:5px 10px}
+.ws-t.sup td:first-child{word-break:keep-all}
+.ws-t.sup .ws-pick{flex-wrap:nowrap}
+.ws-note{margin:4px 0 0;font-size:15px;color:var(--ink-2);line-height:1.8}
+.ws-goal{color:var(--out-ink);font-weight:700}
+.sum3{display:flex;flex-wrap:wrap;gap:12px;justify-content:center;font-size:17px;margin:8px 0}
+.sum-box{--mc:var(--m-sup);border:2px solid var(--mc);border-radius:10px;padding:6px 14px;background:color-mix(in oklab,var(--mc) 8%,var(--surface))}
+.sum-box.lift{--mc:var(--m-lift)}.sum-box.conf{--mc:var(--m-conf)}
+.sum3 math{margin:0}
+/* [표1] 다시 보기 */
+details.t1ref{border-style:solid}
+details.t1ref .orders{margin-top:10px}
+/* 거래 카드: 손님 · 상품 이모지 */
+.order h4 .who{font-weight:500;color:var(--ink-2);margin-left:4px;white-space:nowrap}
+.emo{margin-right:3px}
+/* 거래 카드 = 장바구니: 위 손잡이 + 굵은 윗테 + 둥근 바닥 + 바닥 살 */
+.orders{row-gap:26px;padding-top:16px}
+.order{position:relative;border-width:2px;border-top-width:4px;border-radius:5px 5px 18px 18px;padding:8px 12px 14px;
+  background-image:repeating-linear-gradient(90deg,transparent 0 13px,color-mix(in oklab,var(--line) 70%,transparent) 13px 14px);
+  background-size:100% 7px;background-repeat:no-repeat;background-position:bottom 4px left 0}
+.order::before{content:"";position:absolute;left:24%;right:24%;top:-18px;height:15px;border:3px solid;border-color:inherit;border-bottom:0;border-radius:14px 14px 0 0}
+.ws-total{display:flex;align-items:center;gap:6px;font-weight:600;margin:4px 0 10px}
+.ws-total .ws-cell.sm{width:4.5em}
+/* 2단계 계산식: 포함 거래 수로 자동 작성 */
+.ws-auto{display:inline-block;font-family:var(--mono);color:var(--ink-2);white-space:nowrap}
+.ws-auto.empty{color:var(--muted)}
+/* 2단계 빈발 O/X: O는 하늘색(행 전체 강조), X는 회색 */
+.ws-t.sup .ws-pick input[value="O"]:checked+span{background:#0ea5e9;border-color:#0ea5e9;color:#fff}
+.ws-t.sup .ws-pick input[value="X"]:checked+span{background:#6b7280;border-color:#6b7280;color:#fff}
+.ws-t.sup tr:has(input[value="O"]:checked) td{background:color-mix(in oklab,#38bdf8 20%,var(--surface))}
+/* 3단계 향상도 계산식: 분수 모양 (분자 / 분모 앞 × 분모 뒤) */
+.ws-frac{display:inline-grid;justify-items:center;vertical-align:middle;gap:3px}
+.ws-frac .num{padding-bottom:4px;border-bottom:2px solid var(--ink)}
+.ws-frac .den{display:inline-flex;align-items:center;gap:6px}
+.ws-frac .op{font-weight:600}
+.ws-frac .ws-cell.sm{width:4.5em;margin:0}
+.ws-frac .num{width:100%;display:flex;justify-content:center}
+/* 3단계 향상도 표: 네 열 너비를 똑같이 */
+.ws-t.lift{width:100%;table-layout:fixed}
+.ws-t.lift td,.ws-t.lift th{width:25%;padding:6px 8px}
+.ws-t.lift td:first-child{word-break:keep-all}
+/* 정의 카드 첫 문장(왜 이 지표가 필요한가) 빨간색 */
+.mdef-key{color:#d32f2f;font-weight:600}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .mdef-key{color:#ff6b6b}}
+:root[data-theme="dark"] .mdef-key{color:#ff6b6b}
+/* 4단계 신뢰도 계산식: [ ] ÷ [ ] */
+.ws-div{display:inline-flex;align-items:center;gap:6px}
+.ws-div .op{font-weight:600}
+.ws-div .ws-cell.sm{width:4.5em;margin:0}
+/* 5단계: 답을 쓰는 문장은 네모 상자 안에 */
+.ws-box{border:1px solid var(--line-2);border-radius:10px;padding:8px 14px;background:var(--surface-2);margin:4px 0 12px}
+.ws-box .ws-l{margin:4px 0}
+.ws-box .ws-in{max-width:calc(100% - 2em)}
+/* 한 줄을 다 쓰는 빈칸: ( ……… ) 때문이다. */
+.ws-fill{display:flex;align-items:baseline;gap:2px;width:100%;white-space:nowrap}
+.ws-fill .ws-in{flex:1;min-width:0;max-width:none}
